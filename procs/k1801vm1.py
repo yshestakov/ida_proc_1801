@@ -1999,9 +1999,13 @@ class k1801bm1_processor_t(idaapi.processor_t):
         """
         insn.Op1.type = o_near
         insn.Op1.phrase = 0
-        x = self._code & 0xff
-        # .addr16
-        insn.Op1.addr = (insn.ip + insn.size + 2*x) & 0xffff
+        offs = self._code & 0x7f
+        # offs is signed
+        n_ip = insn.ip + insn.size
+        if (self._code & 0x80) == 0x80:  #
+            insn.Op1.addr = (n_ip - 2 * (0x80 - offs)) & 0xffff
+        else:
+            insn.Op1.addr = (n_ip + 2 * offs) & 0xffff
 
     def ana_nib2_017(self, insn, nibble0, nibble1, nib1swt):
         """
