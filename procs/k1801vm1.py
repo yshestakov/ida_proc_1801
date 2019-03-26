@@ -15,6 +15,11 @@ n_ovrbas = -5
 o_fpreg = o_idpspec0
 o_number = o_idpspec1
 
+# values of CPU
+CPU_PDP11 = 0
+CPU_1801BM1 = 1
+CPU_1801BM2 = 2
+
 # values for insn_t.auxpref
 AUX_SIZEMASK = 0x0F
 AUX_NOSUF = 0x00  # no suffix (e.g. SWPB)
@@ -102,11 +107,11 @@ class k1801bm1_processor_t(idaapi.processor_t):
 
     # short processor names
     # Each name should be shorter than 9 characters
-    psnames = ['k1801bm1']
+    psnames = ['pdp11', 'k1801bm1', 'k1801bm2']
 
     # long processor names
     # No restriction on name lengthes.
-    plnames = ['DEC soviet 1801BM1']
+    plnames = ['DEC PDP-11', 'DEC clone: 1801BM1', 'DEC clone: 1801BM2']
 
     # register names
     reg_names = [
@@ -373,7 +378,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         'uflag': UAS_SECT,
 
         # Assembler name (displayed in menus)
-        'name': "Subset of MACRO-11 assembler",
+        'name': "MACRO-11 assembler",
 
         # array of automatically generated header lines they appear at
         # the start of disassembled text (optional)
@@ -570,6 +575,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         nproc - processor number in the array of processor names
         return >=0-ok,<0-prohibit
         """
+        self._cpu = nproc
         return 0
 
     def notify_newfile(self, filename):
@@ -578,10 +584,10 @@ class k1801bm1_processor_t(idaapi.processor_t):
 
     def notify_oldfile(self, filename):
         """An old file is loaded (already)"""
-        self.ml.asect_top = self.ovrtrans.altval(n_asect & 0xffff)  # & 0xffff
-        self.ml.ovrcallbeg = self.ovrtrans.altval(n_ovrbeg & 0xffff)  # & 0xffff
-        self.ml.ovrcallend = self.ovrtrans.altval(n_ovrend & 0xffff)  # & 0xffff
-        self.ml.ovrtbl_base = self.ovrtrans.altval(n_ovrbas & 0xffff)  # & 0xffffffff
+        self.ml.asect_top = self.ovrtrans.altval(n_asect & 0xffff)
+        self.ml.ovrcallbeg = self.ovrtrans.altval(n_ovrbeg & 0xffff)
+        self.ml.ovrcallend = self.ovrtrans.altval(n_ovrend & 0xffff)
+        self.ml.ovrtbl_base = self.ovrtrans.altval(n_ovrbas & 0xffff)
 
     def notify_newbinary(self, filename, fileoff, basepara, binoff, nbytes):
         """
@@ -1790,6 +1796,8 @@ class k1801bm1_processor_t(idaapi.processor_t):
         """
         Analyze FICOM insns
         """
+        if self.cpu_1801bm1:
+            raise InvalidInsnError()
         ficom = [self.itype_fadd, self.itype_fsub, self.itype_fmul,
                  self.itype_fdiv]
         insn.Op1.type = o_reg
@@ -1808,21 +1816,30 @@ class k1801bm1_processor_t(idaapi.processor_t):
         # .addr16
         insn.Op2.addr = (insn.ip + 2 - (2 * nibble0)) & 0xffff
 
-    def ana_eis(self, insn, nibble0, nibble1, nib1swt):
+    def ana_eis(self, insn, nibble0, nibble1):
         """
         analize EIS
+
+        1. 1801BM1 supports XOR
+        2. 1801BM1a doesn't support MUL, but BM1g -- does
+           at this moment I assume 1801BM1 is 1801BM1a
         """
+        nib1swt = nibble1 >> 3
         eiscom = [self.itype_mul, self.itype_div, self.itype_ash,
                   self.itype_ashc, self.itype_xor]
+        cmd = eiscom[nib1swt]
+        if self.cpu_1801bm1 and cmd != self.itype_xor:
+            raise InvalidInsnError()
         insn.Op2.type = o_reg
         insn.Op2.reg = nibble1 & 7
         self.loadoper(insn, insn.Op1, nibble0)
-        insn.itype = eiscom[nib1swt]
+        insn.itype = cmd
 
-    def ana_nib2_007(self, insn, nibble0, nibble1, nib1swt):
+    def ana_nib2_007(self, insn, nibble0, nibble1):
         """
         Analyze nibble2 == 07
         """
+        nib1swt = nibble1 >> 3
         if nib1swt == 6:  # CIS
             raise InvalidInsnError()
         elif nib1swt == 5:  # FIS
@@ -1832,13 +1849,12 @@ class k1801bm1_processor_t(idaapi.processor_t):
         elif nib1swt == 7:  # SOB
             self.ana_sob(insn, nibble0, nibble1)
         else:
-            self.ana_eis(insn, nibble0, nibble1, nib1swt)
+            self.ana_eis(insn, nibble0, nibble1)
 
-    def ana_nib2_000(self, insn, nibble0, nibble1, nib1swt):
+    def ana_nib2_000(self, insn, nibble0, nibble1):
         """
         Analyze nibble2 == 000
         """
-        # raise NotImplementedError()
         if nibble1 >= 070:
             raise InvalidInsnError()
         if nibble1 > 064:
@@ -1907,12 +1923,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
                 insn.Op1.phrase = v
             return
         elif 0 == nibble1:
-            # 1801BM1 specific: START and STEP
-            if (nibble0 & 014) == 010:
-                insn.itype = self.itype_start
-            elif (nibble0 & 014) == 014:
-                insn.itype = self.itype_step
-            elif nibble0 <= 7:
+            if nibble0 <= 7:
                 # generic PDP-11
                 misc0 = [
                     self.itype_halt, self.itype_wait, self.itype_rti,
@@ -1921,7 +1932,14 @@ class k1801bm1_processor_t(idaapi.processor_t):
                 ]
                 insn.itype = misc0[nibble0]
                 return
-            elif self.cpu_1802bm2 and nibble0 <= 037:
+            if nibble0 < 020 and (self.cpu_1801bm1 or self.cpu_1801bm2):
+                # 1801BM1/BM2 specific: START and STEP
+                if (nibble0 & 014) == 010:
+                    insn.itype = self.itype_start
+                else:  # elif (nibble0 & 014) == 014:
+                    insn.itype = self.itype_step
+                return
+            elif self.cpu_1801bm2 and nibble0 <= 037:
                 # https://zx-pk.ru/threads/17284-km1801vm2-tekhnicheskoe-opisanie/page5.html
                 # https://github.com/nzeemin/bkbtl-doc/wiki/1801vm1-vs-1801vm2-ru
                 bm2_cmd = {
@@ -1933,7 +1951,6 @@ class k1801bm1_processor_t(idaapi.processor_t):
                 if nibble0 not in bm2_cmd:
                     raise InvalidInsnError()
                 insn.itype = bm2_cmd[nibble0]
-
             else:
                 raise InvalidInsnError()
             return
@@ -1959,12 +1976,13 @@ class k1801bm1_processor_t(idaapi.processor_t):
         ]
         insn.itype = onecmd[nibble1 - 050]
 
-    def ana_nib2_010(self, insn, nibble0, nibble1, nib1swt):
+    def ana_nib2_010(self, insn, nibble0, nibble1):
         """
         Analyze nibble2 == 010
         """
         if nibble1 >= 070:
             raise InvalidInsnError()
+        # nib1swt = nibble1 >> 3
         if nibble1 >= 064:
             mt1cmd = [self.itype_mtps, self.itype_mfpd,
                       self.itype_mtpd, self.itype_mfps]
@@ -2007,10 +2025,11 @@ class k1801bm1_processor_t(idaapi.processor_t):
         else:
             insn.Op1.addr = (n_ip + 2 * offs) & 0xffff
 
-    def ana_nib2_017(self, insn, nibble0, nibble1, nib1swt):
+    def ana_nib2_017(self, insn, nibble0, nibble1):
         """
         Analyze nibble2 == 017
         """
+        nib1swt = nibble1 >> 3
         if nibble1 == 0:
             self.ana_017000(insn, nibble0)
             return
@@ -2020,17 +2039,17 @@ class k1801bm1_processor_t(idaapi.processor_t):
         else:
             self.ana_fpcom1(insn, nibble1)
 
-    def ana_add(self, insn, nibble0, nibble1, nib1swt):
+    def ana_add(self, insn, nibble0, nibble1):
         insn.itype = self.itype_add
         self.loadoper(insn, insn.Op1, nibble1)
         self.loadoper(insn, insn.Op2, nibble0)
 
-    def ana_sub(self, insn, nibble0, nibble1, nib1swt):
+    def ana_sub(self, insn, nibble0, nibble1):
         insn.itype = self.itype_sub
         self.loadoper(insn, insn.Op1, nibble1)
         self.loadoper(insn, insn.Op2, nibble0)
 
-    def ana_twoopcmd(self, insn, nibble0, nibble1, nibble2, nib1swt):
+    def ana_twoopcmd(self, insn, nibble0, nibble1, nibble2):
         twoop = [self.itype_mov, self.itype_cmp, self.itype_bit,
                  self.itype_bic, self.itype_bis]
         insn.itype = twoop[(nibble2 & 7) - 1]
@@ -2053,23 +2072,22 @@ class k1801bm1_processor_t(idaapi.processor_t):
         nibble0 = (self._code & 077)
         nibble1 = (self._code >> 6) & 077
         nibble2 = (self._code >> 12) & 017
-        nib1swt = nibble1 >> 3
         try:
             if nibble2 == 017:
-                self.ana_nib2_017(insn, nibble0, nibble1, nib1swt)
+                self.ana_nib2_017(insn, nibble0, nibble1)
             elif nibble2 == 7:
-                self.ana_nib2_007(insn, nibble0, nibble1, nib1swt)
+                self.ana_nib2_007(insn, nibble0, nibble1)
             elif nibble2 == 010:
-                self.ana_nib2_010(insn, nibble0, nibble1, nib1swt)
+                self.ana_nib2_010(insn, nibble0, nibble1)
             elif nibble2 == 0:
-                self.ana_nib2_000(insn, nibble0, nibble1, nib1swt)
+                self.ana_nib2_000(insn, nibble0, nibble1)
             elif nibble2 == 016:
-                self.ana_sub(insn, nibble0, nibble1, nib1swt)
+                self.ana_sub(insn, nibble0, nibble1)
             elif nibble2 == 06:
-                self.ana_add(insn, nibble0, nibble1, nib1swt)
+                self.ana_add(insn, nibble0, nibble1)
             else:
                 # two ops command
-                self.ana_twoopcmd(insn, nibble0, nibble1, nibble2, nib1swt)
+                self.ana_twoopcmd(insn, nibble0, nibble1, nibble2)
         except InvalidInsnError:
             return 0
         if is_bytecmd(insn):
@@ -2121,14 +2139,18 @@ class k1801bm1_processor_t(idaapi.processor_t):
     def emuR0data_lo(self):
         return self.emuR0data & 0xff
 
+    @property
+    def cpu_1801bm1(self):
+        return self._cpu == CPU_1801BM1
+
+    @property
+    def cpu_1801bm2(self):
+        return self._cpu == CPU_1801BM2
+
     # ----------------------------------------------------------------------
     def __init__(self):
         """
-        static union
-        {
-            ushort w;
-            uchar b[2];
-        } emuR0data = { 0xFFFF };
+        Initialize processor instance
         """
         processor_t.__init__(self)
         self.init_instructions()
@@ -2137,9 +2159,9 @@ class k1801bm1_processor_t(idaapi.processor_t):
         self.flow = None
         self.emuFlg = False
         self.emuR0 = 0xffff
-        self.emuR0data = 0xfffF
+        self.emuR0data = 0xffff
         self.ovrtrans = netnode()
-        self.cpu_1802bm2 = True
+        self._cpu = 0
 
 
 # ----------------------------------------------------------------------
