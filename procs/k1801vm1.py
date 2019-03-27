@@ -111,7 +111,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
 
     # long processor names
     # No restriction on name lengthes.
-    plnames = ['DEC PDP-11', 'DEC clone: 1801BM1', 'DEC clone: 1801BM2']
+    plnames = ['DEC PDP-11', 'DEC 1801BM1', 'DEC 1801BM2']
 
     # register names
     reg_names = [
@@ -369,7 +369,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
     # icode_return = 5
 
     # only one assembler is supported
-    assembler = {
+    macro11_assembler = {
         # flag
         'flag': (AS_COLON | AS_2CHRE | AS_NCHRE | ASH_HEXF5 | ASO_OCTF2 |
                  ASD_DECF2 | AS_NCMAS | AS_ONEDUP | ASB_BINF1 | AS_RELSUP),
@@ -426,7 +426,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         'a_dword': ".long",
 
         # remove if not allowed
-        'a_qword': "dq",
+        # 'a_qword': "dq",
 
         # float;  4bytes; remove if not allowed
         'a_float': ".flt2",
@@ -528,7 +528,173 @@ class k1801bm1_processor_t(idaapi.processor_t):
         # 'rva' keyword for image based offsets (optional)
         # (see nalt.hpp, REFINFO_RVA)
         # 'a_rva': "rva"
+
+		# immediate op
+		'imm': '#'
     }  # Assembler
+    # GNU AS assember supports BSD syntax
+    bsd_assembler = {
+        # flag
+        'flag': (AS_COLON | AS_2CHRE | AS_NCHRE | ASH_HEXF5 | ASO_OCTF2 |
+                 ASD_DECF2 | AS_NCMAS | AS_ONEDUP | ASB_BINF1 | AS_RELSUP),
+
+        # user defined flags (local only for IDP) (optional)
+        'uflag': UAS_SECT,
+
+        # Assembler name (displayed in menus)
+        'name': "BSD assembler",
+
+        # array of automatically generated header lines they appear at
+        # the start of disassembled text (optional)
+        'header': [
+            ".title generated_by_ida",
+            '.ident "V00.00"',
+            '.text',
+        ],
+
+        # org directive
+        'origin': ".",
+
+        # end directive
+        'end': ".end",
+
+        # comment string (see also cmnt2)
+        'cmnt': "//",
+
+        # ASCII string delimiter
+        'ascsep': "\\",
+
+        # ASCII char constant delimiter
+        'accsep': "'",
+
+        # ASCII special chars (they can't appear in character
+        # and ascii constants)
+        'esccodes': "\\\200",
+
+        #
+        #      Data representation (db,dw,...):
+        #
+        # ASCII string directive
+        'a_ascii': ".ascii",
+
+        # byte directive
+        'a_byte': ".byte",
+
+        # word directive
+        'a_word': ".word",
+
+        # remove if not allowed
+        'a_dword': ".long",
+
+        # remove if not allowed
+        # 'a_qword': "dq",
+
+        # float;  4bytes; remove if not allowed
+        'a_float': ".flt2",
+
+        # double; 8bytes; NULL if not allowed
+        'a_double': ".flt4",
+
+        # array keyword. the following
+        # sequences may appear:
+        #      #h - header
+        #      #d - size
+        #      #v - value
+        #      #s(b,w,l,q,f,d,o) - size specifiers
+        #                        for byte,word,
+        #                            dword,qword,
+        #                            float,double,oword
+        'a_dups': ".array of #hs cnt=#d val=#v",
+
+        # uninitialized data directive
+        # (should include '%s' for the size of data)
+        'a_bss': ".blkb %s",
+
+        # 'equ' Used if AS_UNEQU is set (optional)
+        'a_equ': "=",
+
+        # 'seg ' prefix (example: push seg seg001)
+        'a_seg': "seg",
+
+        # current IP (instruction pointer) symbol in assembler
+        'a_curip': ".",
+
+        # "public" name keyword. NULL-gen default, ""-do not generate
+        'a_public': ".globl",
+
+        # "weak"   name keyword. NULL-gen default, ""-do not generate
+        'a_weak': ".weak",
+
+        # "extrn"  name keyword
+        'a_extrn': ".globl",
+
+        # "comm" (communal variable)
+        'a_comdef': "",
+
+        # "align" keyword
+        'a_align': ".align",
+
+        # Left and right braces used in complex expressions
+        'lbrace': "<",
+        'rbrace': ">",
+
+        # %  mod     assembler time operation
+        # 'a_mod': "%",
+
+        # &  bit and assembler time operation
+        'a_band': "&",
+
+        # |  bit or  assembler time operation
+        'a_bor': "|",
+
+        # ^  bit xor assembler time operation
+        'a_xor': "^",
+
+        # !  bit not assembler time operation
+        'a_bnot': "!",
+
+        # << shift left assembler time operation
+        # 'a_shl': "<<",
+
+        # >> shift right assembler time operation
+        # 'a_shr': ">>",
+
+        # size of type (format string) (optional)
+        # 'a_sizeof_fmt': "size %s",
+
+        'flag2': 0,
+
+        # comment close string (optional)
+        # this is used to denote a string which closes comments,
+        # for example, if the comments are represented with (* ... *)
+        # then cmnt = "(*" and cmnt2 = "*)"
+        'cmnt2': "",
+
+        # low8 operation, should contain %s for the operand (optional fields)
+        'low8': "",
+        'high8': "",
+        'low16': "",
+        'high16': "",
+
+        # the include directive (format string) (optional)
+        # 'a_include_fmt': ".incl %s",
+
+        # if a named item is a structure and displayed
+        # in the verbose (multiline) form then display the name
+        # as printf(a_strucname_fmt, typename)
+        # (for asms with type checking, e.g. tasm ideal)
+        # (optional)
+        # 'a_vstruc_fmt': "",
+
+        # 'rva' keyword for image based offsets (optional)
+        # (see nalt.hpp, REFINFO_RVA)
+        # 'a_rva': "rva"
+
+        # immediate op
+        'imm': '$'
+    }  # Assembler
+    assembler = macro11_assembler
+    # assembler = bsd_assembler
 
     ml = PdpMl(BADADDR, 0, 0, 0)
     ovrtrans = netnode('$ pdp-11 overlay translations')
@@ -676,28 +842,37 @@ class k1801bm1_processor_t(idaapi.processor_t):
     #     """
     #     return BADADDR
 
-    # def notify_set_idp_options(self, keyword, type, value):
-    #     """
-    #     Set IDP-specific option
-    #     args:
-    #       keyword - the option name
-    #                 or empty string (check type when 0 below)
-    #       type    - one of
-    #                   IDPOPT_STR  string constant
-    #                   IDPOPT_NUM  number
-    #                   IDPOPT_BIT  zero/one
-    #                   IDPOPT_I64  64bit number
-    #                   0 -> You should display a dialog to configure
-    #                        the processor module
-    #       value   - the actual value
-    #     Returns:
-    #        IDPOPT_OK        ok
-    #        IDPOPT_BADKEY    illegal keyword
-    #        IDPOPT_BADTYPE   illegal type of value
-    #        IDPOPT_BADVALUE  illegal value (bad range, for example)
-    #     otherwise return a string containing the error messages
-    #     """
-    #     return idaapi.IDPOPT_OK
+    def notify_set_idp_options(self, keyword, type, value):
+        """
+        Set IDP-specific option
+        args:
+          keyword - the option name
+                    or empty string (check type when 0 below)
+          type    - one of
+                      IDPOPT_STR  string constant
+                      IDPOPT_NUM  number
+                      IDPOPT_BIT  zero/one
+                      IDPOPT_I64  64bit number
+                      0 -> You should display a dialog to configure
+                           the processor module
+          value   - the actual value
+        Returns:
+           IDPOPT_OK        ok
+           IDPOPT_BADKEY    illegal keyword
+           IDPOPT_BADTYPE   illegal type of value
+           IDPOPT_BADVALUE  illegal value (bad range, for example)
+        otherwise return a string containing the error messages
+        """
+        if keyword == 'ASM_SYNTAX':
+            if type != IDPOPT_STR:
+                return IDPOPT_BADTYPE
+            if value == 'DEC':
+                self.assembler['cmnt'] = ';'
+            elif value == 'BSD':
+                self.assembler['cmnt'] = '//'
+            else:
+                return IDPOPT_BADVALUE
+        return idaapi.IDPOPT_OK
 
     # def notify_gen_map_file(self, qfile):
     #     """
@@ -1520,7 +1695,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
             # nothing to do
             return
         else:
-            warning("%" + FMT_EA + "o (%s): bad optype %d" %
+            warning("%" + FMT_EA + "o (%s): bad optype %s" %
                     (insn.ip, insn.get_canon_mnem(), op.type))
         return
 
@@ -1528,7 +1703,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         if ill_imm(op):
             ctx.out_line("(PC)+")
         else:
-            ctx.out_symbol('#')
+            ctx.out_symbol(self.assembler['imm'])  # '#' - DEC, '$' - BSD
             if op.dtype in (dt_float, dt_double):
                 # ctx.out_symbol('^')
                 # ctx.out_symbol('F')
@@ -1542,7 +1717,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
             if op.phrase in (037, 077):
                 ctx.out_symbol('@')
             if op.phrase == 037:
-                ctx.out_symbol('#')
+                ctx.out_symbol(self.assembler['imm'])  # '#' - DEC, '$' - BSD
                 if addr16(op) < self.ml.asect_top and not(is_off(F, op.n)):
                     ctx.out_value(op, OOF_ADDR | OOF_NUMBER | OOFS_NOSIGN |
                                   OOFW_16)
@@ -1616,6 +1791,16 @@ class k1801bm1_processor_t(idaapi.processor_t):
             warning("out: %" + FMT_EA + "o: bad optype %d" %
                     (ctx.insn.ip, op.type))
         return True
+
+    def out_mnem(self, ctx):
+        """
+        Generate the instruction mnemonics
+        """
+
+        postfix = ""
+        if is_bytecmd(ctx.insn):
+            postfix = "b"
+        ctx.out_mnem(8, postfix)
 
     def notify_out_insn(self, ctx):
         """
@@ -1873,6 +2058,9 @@ class k1801bm1_processor_t(idaapi.processor_t):
         if nibble1 >= 040:
             if (nibble1 & 7) == 7:
                 insn.itype = self.itype_call
+                # insn.itype = self.itype_jsr
+                # insn.Op1.type = o_reg
+                # insn.Op1.reg = nibble1 & 7
                 self.jmpoper(insn, insn.Op1, nibble0)
             else:
                 insn.itype = self.itype_jsr
@@ -1893,18 +2081,21 @@ class k1801bm1_processor_t(idaapi.processor_t):
         elif 2 == nibble1:
             if nibble0 == 7:
                 insn.itype = self.itype_return
+                # insn.itype = self.itype_rts
+                # insn.op1.type = o_reg
+                # insn.op1.reg = nibble0
                 return
             if nibble0 < 7:
                 insn.itype = self.itype_rts
-                insn.Op1.type = o_reg
-                insn.Op1.reg = nibble0
+                insn.op1.type = o_reg
+                insn.op1.reg = nibble0
                 return
             if nibble0 < 030:
-                raise InvalidInsnError()
+                raise invalidinsnerror()
             if nibble0 < 040:
                 insn.itype = self.itype_spl
-                insn.Op1.value = nibble0 & 7
-                insn.Op1.type = o_number
+                insn.op1.value = nibble0 & 7
+                insn.op1.type = o_number
                 return
             v = nibble0 & 037
             if 000 == v: insn.itype = self.itype_nop
@@ -2121,7 +2312,8 @@ class k1801bm1_processor_t(idaapi.processor_t):
 
         # Icode of return instruction. It is ok to give any of possible return
         # instructions
-        self.icode_return = self.itype_return
+        # self.icode_return = self.itype_return
+        self.icode_return = self.itype_rts
 
     def init_registers(self):
         for i, r in enumerate(self.reg_names):
