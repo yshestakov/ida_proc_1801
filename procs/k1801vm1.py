@@ -2127,20 +2127,20 @@ class k1801bm1_processor_t(idaapi.processor_t):
             if nibble0 == 7:
                 insn.itype = self.itype_return
                 # insn.itype = self.itype_rts
-                # insn.op1.type = o_reg
-                # insn.op1.reg = nibble0
+                # insn.Op1.type = o_reg
+                # insn.Op1.reg = nibble0
                 return
             if nibble0 < 7:
                 insn.itype = self.itype_rts
-                insn.op1.type = o_reg
-                insn.op1.reg = nibble0
+                insn.Op1.type = o_reg
+                insn.Op1.reg = nibble0
                 return
             if nibble0 < 030:
                 raise invalidinsnerror()
             if nibble0 < 040:
                 insn.itype = self.itype_spl
-                insn.op1.value = nibble0 & 7
-                insn.op1.type = o_number
+                insn.Op1.value = nibble0 & 7
+                insn.Op1.type = o_number
                 return
             v = nibble0 & 037
             if 000 == v: insn.itype = self.itype_nop
