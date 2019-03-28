@@ -2,10 +2,10 @@
 # (c) 2019 by Yuriy Shestakov
 # The code is based on implementation of DEC PDP-11 by Hex-Rays
 # ---------------------------------------------------------------------
-import sys
+# import sys
 import idaapi
 from idaapi import *
-import idc
+# import idc
 
 UAS_SECT = 0x0001  # Segments are named .SECTION
 n_asect = -1
@@ -2053,9 +2053,16 @@ class k1801bm1_processor_t(idaapi.processor_t):
         cmd = eiscom[nib1swt]
         if self.cpu_1801bm1 and cmd != self.itype_xor:
             raise InvalidInsnError()
-        insn.Op2.type = o_reg
-        insn.Op2.reg = nibble1 & 7
-        self.loadoper(insn, insn.Op1, nibble0)
+        if cmd == self.itype_xor:
+            # XOR  R, Dst  where R is Op1, Dst is Op2
+            insn.Op1.type = o_reg
+            insn.Op1.reg = nibble1 & 7
+            self.loadoper(insn, insn.Op2, nibble0)
+        else:
+            # CMD  R, Src  where R is Op1, Src is Op2
+            insn.Op2.type = o_reg
+            insn.Op2.reg = nibble1 & 7
+            self.loadoper(insn, insn.Op1, nibble0)
         insn.itype = cmd
 
     def ana_nib2_007(self, insn, nibble0, nibble1):
