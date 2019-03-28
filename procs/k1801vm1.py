@@ -369,6 +369,11 @@ class k1801bm1_processor_t(idaapi.processor_t):
     # It is ok to give any of possible return instructions
     # icode_return = 5
 
+    # 1801BM1 CPU specific commands
+    bm1_cmd = dict()
+    # 1801BM2 CPU specific commands
+    bm2_cmd = dict()
+
     # only one assembler is supported
     macro11_assembler = {
         # flag
@@ -581,14 +586,14 @@ class k1801bm1_processor_t(idaapi.processor_t):
         'cmnt': "//",
 
         # ASCII string delimiter
-        'ascsep': '""',
+        'ascsep': '"',
 
         # ASCII char constant delimiter
         'accsep': "'",
 
         # ASCII special chars (they can't appear in character
         # and ascii constants)
-        'esccodes': "\\\200",
+        'esccodes': "\\\"",
 
         #
         #      Data representation (db,dw,...):
@@ -731,6 +736,21 @@ class k1801bm1_processor_t(idaapi.processor_t):
         for m in self.assembler['header']:
             ctx.out_line(m)
             ctx.flush_outbuf(0)
+
+        if (self.cpu_1801bm1 or self.cpu_1801bm2):
+            for opcode, itype in self.bm1_cmd.iteritems():
+                self._out_1801_macro(ctx, opcode, self.instruc[itype]['name'])
+        if self.cpu_1801bm2:
+            for opcode, itype in self.bm2_cmd.iteritems():
+                self._out_1801_macro(ctx, opcode, self.instruc[itype]['name'])
+
+    def _out_1801_macro(self, ctx, opcode, name):
+        ctx.out_line(".macro %s" % name)
+        ctx.flush_outbuf(0)
+        ctx.out_line("\t.word %06o" % opcode)
+        ctx.flush_outbuf(0)
+        ctx.out_line(".endm")
+        ctx.flush_outbuf(0)
 
     def notify_out_footer(self, ctx):
         """function to produce end of disassembled text"""
@@ -2123,20 +2143,20 @@ class k1801bm1_processor_t(idaapi.processor_t):
             insn.itype = self.itype_jmp
             self.jmpoper(insn, insn.Op1, nibble0)
             return
-        elif 2 == nibble1:
-            if nibble0 == 7:
+        elif 2 == nibble1:  # 0002xx
+            if nibble0 == 7:  # 000207
                 insn.itype = self.itype_return
                 # insn.itype = self.itype_rts
                 # insn.Op1.type = o_reg
                 # insn.Op1.reg = nibble0
                 return
-            if nibble0 < 7:
+            if nibble0 < 7:  # 00020x  x<7: rts Rx
                 insn.itype = self.itype_rts
                 insn.Op1.type = o_reg
                 insn.Op1.reg = nibble0
                 return
             if nibble0 < 030:
-                raise invalidinsnerror()
+                raise InvalidInsnError()
             if nibble0 < 040:
                 insn.itype = self.itype_spl
                 insn.Op1.value = nibble0 & 7
@@ -2178,15 +2198,9 @@ class k1801bm1_processor_t(idaapi.processor_t):
             elif self.cpu_1801bm2 and nibble0 <= 037:
                 # https://zx-pk.ru/threads/17284-km1801vm2-tekhnicheskoe-opisanie/page5.html
                 # https://github.com/nzeemin/bkbtl-doc/wiki/1801vm1-vs-1801vm2-ru
-                bm2_cmd = {
-                    020: self.itype_rsel, 021: self.itype_mfus,
-                    022: self.itype_rcpc, 024: self.itype_rcps,
-                    031: self.itype_mtus,
-                    032: self.itype_wcpc, 034: self.itype_wcps
-                }
-                if nibble0 not in bm2_cmd:
+                insn.itype = self.bm2_cmd.get(nibble0, 0)
+                if not insn.itype:
                     raise InvalidInsnError()
-                insn.itype = bm2_cmd[nibble0]
             else:
                 raise InvalidInsnError()
             return
@@ -2359,6 +2373,16 @@ class k1801bm1_processor_t(idaapi.processor_t):
         # instructions
         # self.icode_return = self.itype_return
         self.icode_return = self.itype_rts
+        self.bm2_cmd.update({
+            020: self.itype_rsel, 021: self.itype_mfus,
+            022: self.itype_rcpc, 024: self.itype_rcps,
+            031: self.itype_mtus,
+            032: self.itype_wcpc, 034: self.itype_wcps
+        })
+        self.bm1_cmd.update({
+            012: self.itype_start,
+            016: self.itype_step
+        })
 
     def init_registers(self):
         for i, r in enumerate(self.reg_names):
