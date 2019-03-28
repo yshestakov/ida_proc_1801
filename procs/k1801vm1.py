@@ -2,9 +2,10 @@
 # (c) 2019 by Yuriy Shestakov
 # The code is based on implementation of DEC PDP-11 by Hex-Rays
 # ---------------------------------------------------------------------
-# import sys
+import sys
 import idaapi
 from idaapi import *
+import idc
 
 UAS_SECT = 0x0001  # Segments are named .SECTION
 n_asect = -1
@@ -529,14 +530,20 @@ class k1801bm1_processor_t(idaapi.processor_t):
         # (see nalt.hpp, REFINFO_RVA)
         # 'a_rva': "rva"
 
-		# immediate op
-		'imm': '#'
+        # immediate op
+        'imm': '#',
+        'ph1_fmt': '@%s',
+        'ph3_fmt': '@(%s)+',
+        'ph5_fmt': '@-(%s)'
     }  # Assembler
     # GNU AS assember supports BSD syntax
     bsd_assembler = {
-        # flag
-        'flag': (AS_COLON | AS_2CHRE | AS_NCHRE | ASH_HEXF5 | ASO_OCTF2 |
-                 ASD_DECF2 | AS_NCMAS | AS_ONEDUP | ASB_BINF1 | AS_RELSUP),
+        # flag -
+        # https://www.hex-rays.com/products/ida/support/sdkdoc/group___a_s__.html
+        'flag': (AS_COLON | AS_2CHRE | AS_NCHRE | ASH_HEXF3 | ASO_OCTF1 |
+                 ASD_DECF0 | AS_NCMAS | AS_ONEDUP | ASB_BINF3 | AS_RELSUP
+                 # | AS_ASCIIC | AS_ASCIIZ
+                 ),
 
         # user defined flags (local only for IDP) (optional)
         'uflag': UAS_SECT,
@@ -549,6 +556,18 @@ class k1801bm1_processor_t(idaapi.processor_t):
         'header': [
             ".title generated_by_ida",
             '.ident "V00.00"',
+            '.macro call    lbl',
+            '   jsr     pc,\lbl',
+            '.endm',
+            '.macro return',
+            '   rts     pc',
+            '.endm',
+            '.macro marray cmd,count,val',
+            '  .rept \count',
+            '  \cmd \\val',
+            '  .endr',
+            '.endm',
+            '',
             '.text',
         ],
 
@@ -562,7 +581,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         'cmnt': "//",
 
         # ASCII string delimiter
-        'ascsep': "\\",
+        'ascsep': '""',
 
         # ASCII char constant delimiter
         'accsep': "'",
@@ -581,6 +600,8 @@ class k1801bm1_processor_t(idaapi.processor_t):
         'a_byte': ".byte",
 
         # word directive
+        # always 16bit: ".hword",
+        # depending on target asm: ".int"
         'a_word': ".word",
 
         # remove if not allowed
@@ -604,11 +625,11 @@ class k1801bm1_processor_t(idaapi.processor_t):
         #                        for byte,word,
         #                            dword,qword,
         #                            float,double,oword
-        'a_dups': ".array of #hs cnt=#d val=#v",
+        'a_dups': "marray #h,#d,#v",
 
         # uninitialized data directive
         # (should include '%s' for the size of data)
-        'a_bss': ".blkb %s",
+        'a_bss': ".skip %s",
 
         # 'equ' Used if AS_UNEQU is set (optional)
         'a_equ': "=",
@@ -691,10 +712,13 @@ class k1801bm1_processor_t(idaapi.processor_t):
         # 'a_rva': "rva"
 
         # immediate op
-        'imm': '$'
+        'imm': '$',
+        'ph1_fmt': '(%s)',
+        'ph3_fmt': '*(%s)+',
+        'ph5_fmt': '*-(%s)'
     }  # Assembler
-    assembler = macro11_assembler
-    # assembler = bsd_assembler
+    # assembler = macro11_assembler
+    assembler = bsd_assembler
 
     ml = PdpMl(BADADDR, 0, 0, 0)
     ovrtrans = netnode('$ pdp-11 overlay translations')
@@ -702,17 +726,27 @@ class k1801bm1_processor_t(idaapi.processor_t):
     # The following callbacks are optional.
     # *** Please remove the callbacks that you don't plan to implement ***
 
-    # def notify_out_header(self, ctx):
-    #     """function to produce start of disassembled text"""
-    #     pass
+    def notify_out_header(self, ctx):
+        """function to produce start of disassembled text"""
+        for m in self.assembler['header']:
+            ctx.out_line(m)
+            ctx.flush_outbuf(0)
 
     def notify_out_footer(self, ctx):
         """function to produce end of disassembled text"""
-        pass
+        ctx.out_line(self.assembler['end'])
+        ctx.flush_outbuf(0)
 
     def notify_out_segstart(self, ctx, ea):
         """function to produce start of segment"""
-        pass
+        seg = getseg(ea)
+        # kls = get_segm_class(seg)
+        # st_a = idc.SegStart(ea)
+        # end_a = idc.SegEnd(ea)
+        # print "seg.ea: %005o kls: %s: st: %06o end: %06o" % \
+        #        (ea, kls, st_a, end_a)
+        if is_spec_segm(seg.type):
+            return
 
     def notify_out_segend(self, ctx, ea):
         """function to produce end of segment"""
@@ -814,7 +848,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
     #     This function MAY change the database and create
     #     cross-references, etc.
     #     """
-    #     pass
+    #    pass
 
     # def notify_cmp_opnd(self, op1, op2):
     #     """
@@ -1738,15 +1772,19 @@ class k1801bm1_processor_t(idaapi.processor_t):
         ph = op.phrase >> 3
         rn = self.reg_names[op.phrase & 7]
         if 1 == ph:
-            ctx.out_line("@%s" % rn)
+            # DEC: @%s,  BSD: (%s)
+            fmt = self.assembler.get('ph1_fmt', '@%s')
+            ctx.out_line(fmt % rn)
         elif 2 == ph:
             ctx.out_line("(%s)+" % rn)
         elif 3 == ph:
-            ctx.out_line("@(%s)+" % rn)
+            fmt = self.assembler.get('ph3_fmt', '@(%s)+')
+            ctx.out_line(fmt % rn)
         elif 4 == ph:
             ctx.out_line("-(%s)" % rn)
         elif 5 == ph:
-            ctx.out_line("@-(%s)" % rn)
+            fmt = self.assembler.get('ph5_fmt', '@-(%s)')
+            ctx.out_line(fmt % rn)
         else:
             warning("out: %" + FMT_EA + "o: bad optype %d" %
                     (ctx.insn.ip, op.type))
