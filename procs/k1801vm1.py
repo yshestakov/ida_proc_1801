@@ -738,10 +738,10 @@ class k1801bm1_processor_t(idaapi.processor_t):
             ctx.flush_outbuf(0)
 
         if (self.cpu_1801bm1 or self.cpu_1801bm2):
-            for opcode, itype in self.bm1_cmd.iteritems():
+            for opcode, itype in self.bm1_cmd.items():
                 self._out_1801_macro(ctx, opcode, self.instruc[itype]['name'])
         if self.cpu_1801bm2:
-            for opcode, itype in self.bm2_cmd.iteritems():
+            for opcode, itype in self.bm2_cmd.items():
                 self._out_1801_macro(ctx, opcode, self.instruc[itype]['name'])
 
     def _out_1801_macro(self, ctx, opcode, name):
@@ -1535,12 +1535,12 @@ class k1801bm1_processor_t(idaapi.processor_t):
         if Feature & CF_CHG2:
             self.handle_operand(insn, insn.Op2, flag2, False)
         newEA = insn.ea + insn.size
-        if insn.itype == self.itype_emt and insn.Op1.value == 0376:
+        if insn.itype == self.itype_emt and insn.Op1.value == 0o376:
             create_byte(newEA, 2)
             newEA += 2
             add_cref(insn.ea, newEA, fl_F)
         elif (self.flow and
-              not(insn.itype == self.itype_emt and insn.Op1.value == 0350)):
+              not(insn.itype == self.itype_emt and insn.Op1.value == 0o350)):
             if (insn.Op1.type == o_imm and ill_imm(insn.Op1)):
                 newEA += 2
             if (insn.Op2.type == o_imm and ill_imm(insn.Op2)):
@@ -1553,7 +1553,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         insn.add_dref(jmpa, op.offb, dr_R if isload else dr_W)
 
     def op_extxref(self, insn, jmpa, op, isload):
-        if (op.phrase & 070) == 070:
+        if (op.phrase & 0o70) == 0o70:
             self.op_xrefset(insn, jmpa, op, isload)
         if insn.itype == self.itype_jmp:
             insn.add_cref(jmpa, op.offb, fl_JF)
@@ -1585,7 +1585,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         o_displ == op.type:  # 6x/7x (!67/!77)
         """
         set_immd(insn.ea)
-        if (not(isload) and op.phrase == (060 + self.ireg_R0)
+        if (not(isload) and op.phrase == (0o60 + self.ireg_R0)
                 and addr16(op) <= 1):
             self.loadR0data(insn, op, addr16(op))
         tmpa = get_offbase(insn.ea, op.n)
@@ -1609,8 +1609,8 @@ class k1801bm1_processor_t(idaapi.processor_t):
         if insn.itype == self.itype_emt and get_cmt(NULL, insn.ea, False) <= 0:
             tmp = insn
             tmpx = tmp.ops[op.n]
-            if (tmpx.value >= 0374 and tmpx.value <= 0375):
-                if (tmpx.value == 0375):
+            if (tmpx.value >= 0o374 and tmpx.value <= 0o375):
+                if (tmpx.value == 0o375):
                     tmp.Op2.value = self.emuR0data_hi
                 else:
                     tmp.Op2.value = (emuR0 >> 8)
@@ -1666,7 +1666,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
 
     def op_t_phrase(self, insn, op, isload):
         if (op.phrase & 7) == self.ireg_R0:
-            if (not(isload) and op.phrase == (010 + self.ireg_R0)):
+            if (not(isload) and op.phrase == (0o10 + self.ireg_R0)):
                 self.loadR0data(insn, op, 0)
             elif (insn.Op2.type == o_void or op is insn.Op2):
                 self._undefall()
@@ -1768,9 +1768,9 @@ class k1801bm1_processor_t(idaapi.processor_t):
 
     def _out_o_mem(self, ctx, op):
         if op.phrase != 0:
-            if op.phrase in (037, 077):
+            if op.phrase in (0o37, 0o77):
                 ctx.out_symbol('@')
-            if op.phrase == 037:
+            if op.phrase == 0o37:
                 ctx.out_symbol(self.assembler['imm'])  # '#' - DEC, '$' - BSD
                 if addr16(op) < self.ml.asect_top and not(is_off(F, op.n)):
                     ctx.out_value(op, OOF_ADDR | OOF_NUMBER | OOFS_NOSIGN |
@@ -1781,7 +1781,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         else:
             segadr = map_code_ea(ctx.insn, addr16(op), op.n)
         if not ctx.out_name_expr(op, segadr, addr16(op)):
-            if op.type == o_far or addr16(op) < 0160000:
+            if op.type == o_far or addr16(op) < 0o160000:
                 remember_problem(PR_NONAME, ctx.insn.ea)
             ctx.out_value(op, OOF_ADDR | OOF_NUMBER | OOFS_NOSIGN | OOFW_16)
 
@@ -1832,14 +1832,14 @@ class k1801bm1_processor_t(idaapi.processor_t):
             ctx.out_register(self.reg_names[op.reg])
         elif o_fpreg == op.type:
             ctx.out_register(self.reg_names[op.reg + 8])
-        elif o_imm == op.type:  # 027
+        elif o_imm == op.type:  # 0o27
             self._out_o_imm(ctx, op)
         elif op.type in (o_mem, o_near, o_far):
             self._out_o_mem(ctx, op)
         elif o_number == op.type:  # EMT/TRAP/MARK/SPL
             ctx.out_value(op, OOF_NUMBER | OOFS_NOSIGN | OOFW_8)
         elif o_displ == op.type:
-            if op.phrase >= 070:
+            if op.phrase >= 0o70:
                 ctx.out_symbol('@')
             ctx.out_value(op, OOF_ADDR | OOF_SIGNED | OOFW_16)
             ctx.out_line("(%s)" % self.reg_names[op.phrase & 7])
@@ -1878,8 +1878,8 @@ class k1801bm1_processor_t(idaapi.processor_t):
             ]
             code = ctx.insn.Op1.phrase
             ctx.out_symbol('<')
-            if code >= 020:
-                code ^= 020
+            if code >= 0o20:
+                code ^= 0o20
                 if code == 0:
                     ctx.out_line(COLSTR("nop!^O20", SCOLOR_INSN))
                 i = 4
@@ -1906,7 +1906,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         Handle jump operand
         """
         self.loadoper(insn, op, nibble0)
-        if op.type == o_mem and op.phrase != 077:
+        if op.type == o_mem and op.phrase != 0o77:
             op.type = o_near
         # FIXME ml & ovrtrans !!!
         if (op.type == o_near and addr16(op) >= self.ml.ovrcallbeg
@@ -1925,7 +1925,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
                     op.addr = a & 0xffff
 
     def loadoper(self, insn, op, nibble):
-        if nibble == 027:
+        if nibble == 0o27:
             F1 = get_flags(insn.ea)
             F2 = get_flags(insn.ea+insn.size)
             op.type = o_imm
@@ -1937,22 +1937,22 @@ class k1801bm1_processor_t(idaapi.processor_t):
                 op.specflag1 = is_head(F2)
             op.offb = insn.size & 0xff
             op.value = insn.get_next_word()
-        elif nibble in (037, 077, 067):
+        elif nibble in (0o37, 0o77, 0o67):
             op.type = o_mem
             op.offb = insn.size & 0xff
             base = insn.get_next_word()
             op.phrase = nibble
-            if nibble != 037:
+            if nibble != 0o37:
                 base += (insn.ip + insn.size) & 0xffff
             # op.addr16 is op.addr_shorts.low
             op.addr = base & 0xffff
         else:
-            if (nibble & 070) == 0:
+            if (nibble & 0o70) == 0:
                 op.type = o_reg
                 op.reg = nibble
             else:
                 op.phrase = nibble
-                if nibble < 060:
+                if nibble < 0o60:
                     op.type = o_phrase
                 else:
                     op.type = o_displ
@@ -1966,9 +1966,9 @@ class k1801bm1_processor_t(idaapi.processor_t):
             insn.itype = self.itype_setf
         elif nibble0 == 2:
             insn.itype = self.itype_seti
-        elif nibble0 == 011:
+        elif nibble0 == 0o11:
             insn.itype = self.itype_setd
-        elif nibble0 == 012:
+        elif nibble0 == 0o12:
             insn.itype = self.itype_setl
         else:
             raise InvalidInsnError()
@@ -2087,13 +2087,13 @@ class k1801bm1_processor_t(idaapi.processor_t):
 
     def ana_nib2_007(self, insn, nibble0, nibble1):
         """
-        Analyze nibble2 == 07
+        Analyze nibble2 == 0o7
         """
         nib1swt = nibble1 >> 3
         if nib1swt == 6:  # CIS
             raise InvalidInsnError()
         elif nib1swt == 5:  # FIS
-            if nibble1 != 050 or nibble0 >= 040:
+            if nibble1 != 0o50 or nibble0 >= 0o40:
                 raise InvalidInsnError()
             self.ana_ficom(insn, nibble0)
         elif nib1swt == 7:  # SOB
@@ -2105,22 +2105,22 @@ class k1801bm1_processor_t(idaapi.processor_t):
         """
         Analyze nibble2 == 000
         """
-        if nibble1 >= 070:
+        if nibble1 >= 0o70:
             raise InvalidInsnError()
-        if nibble1 > 064:
+        if nibble1 > 0o64:
             mt2cmd = [self.itype_mfpi, self.itype_mtpi, self.itype_sxt]
-            insn.itype = mt2cmd[nibble1 - 065]
+            insn.itype = mt2cmd[nibble1 - 0o65]
             self.loadoper(insn, insn.Op1, nibble0)
             return
-        if nibble1 == 064:
+        if nibble1 == 0o64:
             insn.itype = self.itype_mark
             insn.Op1.type = o_number
             insn.Op1.value = nibble0
             return
-        if nibble1 >= 050:
+        if nibble1 >= 0o50:
             self.oneoper(insn, nibble0, nibble1)
             return
-        if nibble1 >= 040:
+        if nibble1 >= 0o40:
             if (nibble1 & 7) == 7:
                 insn.itype = self.itype_call
                 # insn.itype = self.itype_jsr
@@ -2143,37 +2143,37 @@ class k1801bm1_processor_t(idaapi.processor_t):
             insn.itype = self.itype_jmp
             self.jmpoper(insn, insn.Op1, nibble0)
             return
-        elif 2 == nibble1:  # 0002xx
-            if nibble0 == 7:  # 000207
+        elif 2 == nibble1:  # 0o0002xx
+            if nibble0 == 7:  # 0o000207
                 insn.itype = self.itype_return
                 # insn.itype = self.itype_rts
                 # insn.Op1.type = o_reg
                 # insn.Op1.reg = nibble0
                 return
-            if nibble0 < 7:  # 00020x  x<7: rts Rx
+            if nibble0 < 7:  # 0o00020x  x<7: rts Rx
                 insn.itype = self.itype_rts
                 insn.Op1.type = o_reg
                 insn.Op1.reg = nibble0
                 return
-            if nibble0 < 030:
+            if nibble0 < 0o30:
                 raise InvalidInsnError()
-            if nibble0 < 040:
+            if nibble0 < 0o40:
                 insn.itype = self.itype_spl
                 insn.Op1.value = nibble0 & 7
                 insn.Op1.type = o_number
                 return
-            v = nibble0 & 037
-            if 000 == v: insn.itype = self.itype_nop
-            elif 001 == v: insn.itype = self.itype_clc
-            elif 002 == v: insn.itype = self.itype_clv
-            elif 004 == v: insn.itype = self.itype_clz
-            elif 010 == v: insn.itype = self.itype_cln
-            elif 017 == v: insn.itype = self.itype_ccc
-            elif 021 == v: insn.itype = self.itype_sec
-            elif 022 == v: insn.itype = self.itype_sev
-            elif 024 == v: insn.itype = self.itype_sez
-            elif 030 == v: insn.itype = self.itype_sen
-            elif 037 == v: insn.itype = self.itype_scc
+            v = nibble0 & 0o37
+            if 0o00 == v: insn.itype = self.itype_nop
+            elif 0o01 == v: insn.itype = self.itype_clc
+            elif 0o02 == v: insn.itype = self.itype_clv
+            elif 0o04 == v: insn.itype = self.itype_clz
+            elif 0o10 == v: insn.itype = self.itype_cln
+            elif 0o17 == v: insn.itype = self.itype_ccc
+            elif 0o21 == v: insn.itype = self.itype_sec
+            elif 0o22 == v: insn.itype = self.itype_sev
+            elif 0o24 == v: insn.itype = self.itype_sez
+            elif 0o30 == v: insn.itype = self.itype_sen
+            elif 0o37 == v: insn.itype = self.itype_scc
             else:
                 insn.itype = self.itype_compcc
                 insn.Op1.phrase = v
@@ -2188,14 +2188,14 @@ class k1801bm1_processor_t(idaapi.processor_t):
                 ]
                 insn.itype = misc0[nibble0]
                 return
-            if nibble0 < 020 and (self.cpu_1801bm1 or self.cpu_1801bm2):
+            if nibble0 < 0o20 and (self.cpu_1801bm1 or self.cpu_1801bm2):
                 # 1801BM1/BM2 specific: START and STEP
-                if (nibble0 & 014) == 010:
+                if (nibble0 & 0o14) == 0o10:
                     insn.itype = self.itype_start
-                else:  # elif (nibble0 & 014) == 014:
+                else:  # elif (nibble0 & 0o14) == 0o14:
                     insn.itype = self.itype_step
                 return
-            elif self.cpu_1801bm2 and nibble0 <= 037:
+            elif self.cpu_1801bm2 and nibble0 <= 0o37:
                 # https://zx-pk.ru/threads/17284-km1801vm2-tekhnicheskoe-opisanie/page5.html
                 # https://github.com/nzeemin/bkbtl-doc/wiki/1801vm1-vs-1801vm2-ru
                 insn.itype = self.bm2_cmd.get(nibble0, 0)
@@ -2224,30 +2224,30 @@ class k1801bm1_processor_t(idaapi.processor_t):
             self.itype_neg, self.itype_adc, self.itype_sbc, self.itype_tst,
             self.itype_ror, self.itype_rol, self.itype_asr, self.itype_asl
         ]
-        insn.itype = onecmd[nibble1 - 050]
+        insn.itype = onecmd[nibble1 - 0o50]
 
     def ana_nib2_010(self, insn, nibble0, nibble1):
         """
-        Analyze nibble2 == 010
+        Analyze nibble2 == 0o10
         """
-        if nibble1 >= 070:
+        if nibble1 >= 0o70:
             raise InvalidInsnError()
         # nib1swt = nibble1 >> 3
-        if nibble1 >= 064:
+        if nibble1 >= 0o64:
             mt1cmd = [self.itype_mtps, self.itype_mfpd,
                       self.itype_mtpd, self.itype_mfps]
-            insn.itype = mt1cmd[nibble1 - 064]
+            insn.itype = mt1cmd[nibble1 - 0o64]
             self.loadoper(insn, insn.Op1, nibble0)
             return
-        if nibble1 >= 050:
+        if nibble1 >= 0o50:
             set_bytecmd(insn)
             # oneoper:
             self.oneoper(insn, nibble0, nibble1)
             return
-        if nibble1 >= 040:
+        if nibble1 >= 0o40:
             insn.Op1.type = o_number  # EMT/TRAP
-            insn.Op1.value = self._code & 0377
-            if nibble1 >= 044:
+            insn.Op1.value = self._code & 0o377
+            if nibble1 >= 0o44:
                 insn.itype = self.itype_trap
             else:
                 insn.itype = self.itype_emt
@@ -2277,7 +2277,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
 
     def ana_nib2_017(self, insn, nibble0, nibble1):
         """
-        Analyze nibble2 == 017
+        Analyze nibble2 == 0o17
         """
         nib1swt = nibble1 >> 3
         if nibble1 == 0:
@@ -2303,7 +2303,7 @@ class k1801bm1_processor_t(idaapi.processor_t):
         twoop = [self.itype_mov, self.itype_cmp, self.itype_bit,
                  self.itype_bic, self.itype_bis]
         insn.itype = twoop[(nibble2 & 7) - 1]
-        if (nibble2 & 010) != 0:
+        if (nibble2 & 0o10) != 0:
             set_bytecmd(insn)
         else:
             set_wordcmd(insn)
@@ -2319,21 +2319,21 @@ class k1801bm1_processor_t(idaapi.processor_t):
             return 0
         insn.Op1.dtype = insn.Op2.dtype = dt_word
         self._code = insn.get_next_word()
-        nibble0 = (self._code & 077)
-        nibble1 = (self._code >> 6) & 077
-        nibble2 = (self._code >> 12) & 017
+        nibble0 = (self._code & 0o77)
+        nibble1 = (self._code >> 6) & 0o77
+        nibble2 = (self._code >> 12) & 0o17
         try:
-            if nibble2 == 017:
+            if nibble2 == 0o17:
                 self.ana_nib2_017(insn, nibble0, nibble1)
             elif nibble2 == 7:
                 self.ana_nib2_007(insn, nibble0, nibble1)
-            elif nibble2 == 010:
+            elif nibble2 == 0o10:
                 self.ana_nib2_010(insn, nibble0, nibble1)
             elif nibble2 == 0:
                 self.ana_nib2_000(insn, nibble0, nibble1)
-            elif nibble2 == 016:
+            elif nibble2 == 0o16:
                 self.ana_sub(insn, nibble0, nibble1)
-            elif nibble2 == 06:
+            elif nibble2 == 0o6:
                 self.ana_add(insn, nibble0, nibble1)
             else:
                 # two ops command
@@ -2354,8 +2354,8 @@ class k1801bm1_processor_t(idaapi.processor_t):
         """
         handle an operand for byte comand
         """
-        if ((op.type == o_mem and op.phrase != 077) or
-                (op.type == o_displ and (op.phrase & 070) == 060)):
+        if ((op.type == o_mem and op.phrase != 0o77) or
+                (op.type == o_displ and (op.phrase & 0o70) == 0o60)):
             op.dtype = dt_byte
 
     # ----------------------------------------------------------------------
@@ -2374,14 +2374,14 @@ class k1801bm1_processor_t(idaapi.processor_t):
         # self.icode_return = self.itype_return
         self.icode_return = self.itype_rts
         self.bm2_cmd.update({
-            020: self.itype_rsel, 021: self.itype_mfus,
-            022: self.itype_rcpc, 024: self.itype_rcps,
-            031: self.itype_mtus,
-            032: self.itype_wcpc, 034: self.itype_wcps
+            0o20: self.itype_rsel, 0o21: self.itype_mfus,
+            0o22: self.itype_rcpc, 0o24: self.itype_rcps,
+            0o31: self.itype_mtus,
+            0o32: self.itype_wcpc, 0o34: self.itype_wcps
         })
         self.bm1_cmd.update({
-            012: self.itype_start,
-            016: self.itype_step
+            0o12: self.itype_start,
+            0o16: self.itype_step
         })
 
     def init_registers(self):
